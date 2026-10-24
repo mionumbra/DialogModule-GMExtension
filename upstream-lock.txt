@@ -1,0 +1,10 @@
+# Downstream build lock for libdlgmod.
+#
+# Update this file when you sync a new upstream version, then rebuild (push to
+# pcr / tag pcr-<ref>). The build scripts do not read this file automatically;
+# it exists so that every release binary can be traced back to an upstream ref.
+
+upstream_repo=samuelvenable/DialogModule-GMExtension
+upstream_ref=fd3af5919495
+game_maker_runtime=2026.0.0.23
+prefix=ldm_

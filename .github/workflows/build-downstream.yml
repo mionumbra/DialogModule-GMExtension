@@ -1,0 +1,101 @@
+name: build-downstream
+
+# Downstream build of libdlgmod with prefixed DLL exports.
+#
+# Branch layout (see README.md):
+#   main  - mirror of upstream/main, never contains downstream changes
+#   pcr   - this branch: adds .github/ + tools/ only (no upstream file edits)
+#
+# Push to `pcr` builds all platforms. Push a tag like `pcr-<upstream-tag>`
+# to attach the built binaries to a GitHub release.
+
+on:
+  push:
+    branches: [pcr]
+    tags: ["pcr-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows DLL
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: microsoft/setup-msbuild@v2
+      - name: Build libdlgmod.dll
+        run: python tools/build_windows.py --platform-toolset v143
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/
+          if-no-files-found: error
+
+  linux:
+    name: Linux SO
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config \
+            libx11-dev libxrandr-dev libdbus-1-dev
+      # arm32/arm64 cross compilers are optional. Install the packages below
+      # and set BUILD_ARM=1 if you also need libdlgmod_arm/.so:
+      #   g++-arm-linux-gnueabihf g++-aarch64-linux-gnu (plus matching cross libs)
+      - name: Build libdlgmod.so
+        run: bash tools/build_linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/
+          if-no-files-found: error
+
+  macos:
+    name: macOS dylib
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build libdlgmod.dylib
+        run: bash tools/build_macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    name: Attach binaries to release
+    if: startsWith(github.ref, 'refs/tags/pcr-')
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Package
+        run: |
+          cd release
+          zip -r "../libdlgmod-downstream-${GITHUB_REF_NAME}.zip" .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: libdlgmod-downstream-${{ github.ref_name }}.zip
+          body: |
+            Downstream build of libdlgmod with prefixed DLL exports.
+            The upstream ref used for this build is recorded in `upstream-lock.txt`.
