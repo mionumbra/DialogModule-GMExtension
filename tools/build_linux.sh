@@ -47,8 +47,9 @@ shim_compiler() {
     fi
 }
 shim_compiler x86_64-linux-gnu-g++ g++
-shim_compiler aarch64-linux-gnu-g++ g++
-shim_compiler arm-linux-gnueabihf-g++ g++
+# Do NOT alias the arm cross compilers to the host g++: that would silently
+# produce x86_64 objects named libdlgmod_arm*.so. Arm builds are skipped unless
+# a real cross toolchain is installed.
 export PATH="${SHIM}:${PATH}"
 
 for script in build-gm-x86_64.sh build-gm-x86_32.sh build-gm-arm32.sh build-gm-arm64.sh; do
