@@ -249,8 +249,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"expected  : {len(expected)}")
     for name in missing:
         print(f"  missing : {name}")
-    for name in extra:
+    for name in extra[:10]:
         print(f"  extra   : {name}")
+    if len(extra) > 10:
+        print(f"  ... {len(extra) - 10} more extra exports")
     for name in unrenamed:
         print(f"  UNRENAMED builtin collision: {name}")
 
@@ -259,7 +261,12 @@ def main(argv: list[str] | None = None) -> int:
         failed = True
     if missing and not args.allow_missing:
         failed = True
-    if extra and not args.allow_extra:
+    # ELF/Mach-O shared libraries also export internal C++/dependency symbols.
+    # Only the expected exports and the absence of unrenamed builtin-collision
+    # names matter there; PE DLLs stay strict because they only export
+    # __declspec(dllexport) symbols.
+    extra_allowed = args.allow_extra or fmt in {"elf", "macho"}
+    if extra and not extra_allowed:
         failed = True
 
     if failed:

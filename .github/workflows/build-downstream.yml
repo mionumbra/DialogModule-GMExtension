@@ -28,8 +28,26 @@ jobs:
         with:
           python-version: "3.12"
       - uses: microsoft/setup-msbuild@v2
+      - name: Ensure ATL headers (needed by the win32 sources)
+        shell: pwsh
+        run: |
+          $atls = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\atlmfc\include\atlbase.h" -ErrorAction SilentlyContinue
+          if ($atls) {
+            Write-Host "ATL found: $($atls[0].FullName)"
+            exit 0
+          }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $inst = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $inst) { throw "Visual Studio installation not found" }
+          $setup = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          Write-Host "Installing ATL into $inst ..."
+          & $setup modify --installPath $inst --add Microsoft.VisualStudio.Component.VC.ATLMFC --quiet --norestart
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw "VS installer failed: $LASTEXITCODE" }
+          $atls = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\atlmfc\include\atlbase.h" -ErrorAction SilentlyContinue
+          if (-not $atls) { throw "ATL headers still missing after installation" }
+          Write-Host "ATL installed: $($atls[0].FullName)"
       - name: Build libdlgmod.dll
-        run: python tools/build_windows.py --platform-toolset v143
+        run: python tools/build_windows.py --platform-toolset v145
       - uses: actions/upload-artifact@v4
         with:
           name: windows
